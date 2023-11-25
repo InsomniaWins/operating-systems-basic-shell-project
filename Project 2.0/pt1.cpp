@@ -35,9 +35,6 @@ int parseCommand(string, struct commandType *);
 // print the input prompt
 void printPrompt();
 
-// read command from terminal to string
-void readCommand(string);
-
 
 int main(){
 
