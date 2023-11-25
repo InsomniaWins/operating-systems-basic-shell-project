@@ -1,0 +1,19 @@
+{
+    "C_Cpp.default.compilerPath": "/bin/g++",
+    "files.associations": {
+        "array": "cpp",
+        "*.tcc": "cpp",
+        "deque": "cpp",
+        "string": "cpp",
+        "vector": "cpp",
+        "string_view": "cpp",
+        "algorithm": "cpp",
+        "istream": "cpp",
+        "limits": "cpp",
+        "numeric": "cpp",
+        "streambuf": "cpp",
+        "functional": "cpp",
+        "iostream": "cpp"
+    },
+    "cmake.configureOnOpen": false
+}

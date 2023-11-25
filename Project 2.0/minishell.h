@@ -1,17 +1,18 @@
+#include <string>
+#include <vector>
 
-#define LINE_LEN    80
-#define MAX_ARGS    64
-#define MAX_ARG_LEN 16
-#define MAX_PATHS   64
-#define MAX_PATH_LEN    96
-#define WHITESPACE  " .,\t\n"
+#define WHITESPACE      " .,\t\n"
 
 #ifndef NULL
 #define NULL 
 #endif
 
-struct command_t{
-    char *name;
-    int argc;
-    string argv[MAX_ARGS];
+using namespace std;
+
+// structure that holds information of command inputted into shell
+struct commandType {
+    // name of the command (i.e. "gcc" or "g++" or "cd" or "ls" etc . . .)
+    string name;
+    // vector of arguments as strings (i.e. ["c", "-o", "compiled program name"])
+    vector<string> arguments;
 };

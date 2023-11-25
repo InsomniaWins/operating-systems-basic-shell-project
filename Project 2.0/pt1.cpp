@@ -1,198 +1,246 @@
+// compile command:
+//    g++ "Project 2.0/pt1.cpp" -lpthread -o "part1"
+// run command:
+//    ./"part1"
+
+
+// external headers/includes
 #include <sys/wait.h>
 #include <stdio.h>
 #include <iostream>
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include "minishell.h"
 #include <string>
 #include <string.h>
+#include <vector>
 
+// custom headers/includes
+#include "minishell.h"
 
+// namespace for ease of use of standard library
 using namespace std;
-string *lookupPath(char **, char **);
-int parseCommand(char *, struct command_t *);
-int parsePath(char **);
+
+
+// parses the path variable for absolute directories of commands/programs
+vector<string> parsePath();
+
+// looks through path environment variables for inputted command name
+// returns empty string if no command path is found
+string lookupPath(string, vector<string>);
+
+// parses command into a commandType structure
+int parseCommand(string, struct commandType *);
+
+// print the input prompt
 void printPrompt();
+
+// read command from terminal to string
 void readCommand(string);
+
 
 int main(){
 
-    /*Shell initialization*/
-    //"enter command"
+    //Shell initialization
     
-    
-    //pathv
-    string dIR[MAX_PATH_LEN];
-    //this will literally be a string of commands
-    //aka the directory
-    int parseReturnCode = parsePath(dIR); /*Get directory paths from PATH*/
-    //we can error check with this var
-    //this is where Path var goes
+    // get vector of all path directories
+    vector<string> paths = parsePath();
+    /*    uncomment to print all dirs in PATH
+    for (int i = 0; i < parsedPaths.size(); i++) {
+        cout << '"' << parsedPaths[i] << '"' << '\n';
+    }
+    */
 
-    while(1){
+    // start shell main loop
+    while (true) {
+        
+        // print user input prompt
         printPrompt();
 
-        /*Read the command line and parse it*/
-        //readCommand(commandLine);
-        string commandLine;
-        cin>>commandLine;
-
-        parseCommand(commandLine, &command);
-
-        /*Get the full pathname for the file*/
-        command.name = lookupPath(command.argv, pathv);
-        if(command.name == NULL){
-            /*report error*/
-            printf("Error: NULL command\n");
-            continue;
-        }
-        /*if(command.name.toLower() == "quit"){
-            break;
+        // get user input string
+        string inputCommand;
+        getline(cin, inputCommand);
+        
+        // parse input into command struct
+        commandType command;
+        parseCommand(inputCommand, &command);
+        /*    uncomment to print all command arguments
+        for (int i = 0; i < command.arguments.size(); i++) {
+            cout << '"' << command.arguments[i] << '"' << '\n';
         }*/
 
-        /*create child and execute the command*/
-        int id = fork();
-        /*Wait for the child to terminate*/
+        // if command is quit command (no need for new process/thread)
+        // TODO: make quit command NOT case sensitive
+        if (command.arguments[0] == "quit") {
+            // exit main loop and finish shell process
+            break;
+        }
+
+
+        // get path of command
+        string commandPath = lookupPath(command.arguments[0], paths);
+
+        // ask user for input again if path of command could not be found
+        if (commandPath.empty()) {
+            cout << "command: " << command.arguments[0] << " is not a recognized command!\n";
+            break;
+        }
         
-        if(id == 0){//fork to child
-            //run the command
+        cout << "commandPath: " << commandPath << "\n";
 
-        }else{
-            waitpid(id, NULL, NULL);
-            //hopefully this works on linux
+        int pid = fork();
+        if (pid == 0) {
+            // run command in child
+            // TODO: execute command
+            cout << "Hello from pid: " << getpid() << "\n";
+            exit(EXIT_SUCCESS);
+        } else {
+            // wait for child to finish executing command
+            waitpid(pid, NULL, 0);
         }
-        //child all in main
+    }
 
+    //Shell termination
+
+    cout << "finished shell program\n";
+}
+
+
+// TODO: test if function works with absolute paths, might not
+// returns directory of command inputted
+// searches through given array of directories for command directory to return
+// if none match, return empty string
+string lookupPath(string commandName, vector<string> paths){
+    
+    // param descriptions:
+    //   commandName - name of command inputted
+    //   directories - array of directories to check if command (i.e. "gcc") is inside
+
+    // if first character of command begins with '/' character
+    // then the command is an absolute path
+    if (commandName[0] == '/') {
+        // if the directory exists, return the directory
+        if (access(commandName.c_str(), R_OK) == 0) {
+            // returns a copy of commandName to avoid accidental tampering with string commandName
+            return string(commandName);
+        } else { // else, return empty
+            return string();
+        }
+    }
+
+
+    // past this point must mean that the command inputted is not an absolute path
+
+
+    // loop through path variables
+    for (int i = 0; i < paths.size(); i++) {
+        // if path variable matched the inputted command name, return path variable directory
+
+        string currentAbsoluteDirectory = paths[i] + '/' + commandName;
+
+        // uncomment to check the directories that were checked
+        cout << "[lookupPath] checking directory:  " << currentAbsoluteDirectory << "\n";
+
+        if (access(currentAbsoluteDirectory.c_str(), R_OK) == 0) {
+            // command exists in directory, return new string of current directory
+            return string(paths[i]);
+        }
 
     }
 
-    /*Shell termination*/
 
-    //freeing memory
-    //delete thePath;
-
-
+    // command is not an absolute directory
+    // command could not be found in PATH
+    // so, the command could not be found
+    // therefore, print error and return empty
+    return string();
 }
 
+
+
+// prints a prompt for user to enter a command
 void printPrompt(){
-    char promptString[] = "Enter you command: "; 
-    printf("%s", promptString);
+    cout << "Enter you command: ";
 }
 
-void readCommand(string buffer){
-    gets(buffer);
-}
+// gets and parses the path string by using ':' as a delemiter/splitter
+// then returns a vector of all directories in path string
+vector<string> parsePath() {
 
-int parsePath(string dirs[]){
+    // init directories vector
+    vector<string> directories;
 
-   char* pathEnvVar;
-   
+    // get path string
+    string pathString = getenv("PATH");
 
-    for(int i=0; i<MAX_ARGS; i++){
-        dirs[i] = nullptr;
-        //null pointer string to initialize the array
-    }
-   
-   pathEnvVar = getenv("PATH");
-    //PATH is the library of the commands
-    //aka path vars
-    //the commands are programs
-   string thePath(pathEnvVar);
- 
-    //return string path
-    //...
-    int copyPos = 0;
-    int availablePosInArray = 0;
-    for(int i=0; i<thePath.length(); i++){
-        if(thePath[i] == ':'){
-            dirs[availablePosInArray] = thePath.substr(copyPos, i-1);
-            copyPos = i + 1;
-            availablePosInArray++;
+    // parse
+    int copyPosition = 0; // index of character to start substr method
+    for (int currentCharacterIndex = 0; currentCharacterIndex < pathString.length(); currentCharacterIndex++) {
+        // if delimeter char
+        if (pathString[currentCharacterIndex] == ':') {
+            // get directory as string
+            int directoryLength = currentCharacterIndex - copyPosition;
+            string directoryString = pathString.substr(copyPosition, directoryLength);
+            
+            // add to return vector
+            directories.push_back(directoryString);
+
+            // new substr position to after the ':' character
+            copyPosition = currentCharacterIndex+1;
         }
-
     }
 
-
+    return directories;
     //error check 
 }
 
-string *lookupPath(char **argv, char **dir){
-    char *result;
-    char pName[MAX_ARG_LEN];
 
-    if(*argv[0] == '/'){
-        //...
+// parses command input string into a commandType structure
+int parseCommand(string commandString, struct commandType * commandStruct) {
 
-        //this is for absolute paths
-        //return Null or the path char*[]
-    }
+    // param descriptions:
+    //   commandString - the whole line of text inputted to the terminal
+    //   commandStruct - pointer to struct that will be filled with command info
 
-    for(int i=0; i<MAX_PATHS; i++){
-        //...
-        //if found, should return in here
-    }
+    // TODO: command probably needs to trim extra whitespaces from end of command
+    // to prevent additional args like ["arg1","arg2", ... ,"",""]
 
-    //file not found
-    fprintf(stderr, "%s: command no found\n", argv[0]);
-    return NULL;
-}
-int parseCommand(string cLine, struct command_t *cmd){
-    int argc = 0;
-    //argument counter
-    /*string clPtr;
-    clPtr = cLine;*/
-    cmd->argv[argc] = (char *)malloc(MAX_ARG_LEN);
-    int i = 0;
-    string hold ="";
-    whileLoop: 
-    while(cLine[i] != NULL){
-
-        for(int j=0; j<strlen(WHITESPACE); j++){
-            if(cLine[i] == WHITESPACE[j]){
-                cmd->argv[argc] = hold;
-                hold ="";
-                goto whileLoop;
+    // parse
+    int copyPosition = 0; // index of character to start substr method
+    for (int currentCharacterIndex = 0; currentCharacterIndex < commandString.length(); currentCharacterIndex++) {
+        
+        // check if current character is whitespace
+        bool charIsWhitespace = false;
+        for (int i = 0; i < sizeof(WHITESPACE); i++) {
+            if (WHITESPACE[i] == commandString[currentCharacterIndex]) {
+                charIsWhitespace = true;
+                break;
             }
         }
-        hold+=cLine[i];
-        i++;
-    }
-    //word.word.word
-    int copyPos = 0;
-    int availablePosInArray = 0;
-    while((cmd->argv[argc] = strsep(clPtr, WHITESPACE)) != NULL){
 
-    }
-    /*for(int i=0; i<thePath.length(); i++){
-        if(thePath[i] == ':'){
-            dirs[availablePosInArray] = thePath.substr(copyPos, i-1);
-            copyPos = i + 1;
-            availablePosInArray++;
+        // if current character is whitespace, then the next arg is found
+        if (charIsWhitespace) {
+            // get arg as string
+            int argLength = currentCharacterIndex - copyPosition;
+            string argString = commandString.substr(copyPosition, argLength);
+            
+            // add arg to struct
+            commandStruct->arguments.push_back(argString);
+
+            // new substr position to after the whitespace
+            copyPosition = currentCharacterIndex+1;
+        } else if (currentCharacterIndex+1 == commandString.length()) {
+            // end of commandString reached
+
+            int argLength = commandString.length() - copyPosition;
+            string argString = commandString.substr(copyPosition, argLength);
+
+            // add final arg to struct
+            commandStruct->arguments.push_back(argString);
+
+            // dont need to update copyPosition, because end of string occured
         }
-
-    }*/
-    
-}
-/*int parseCommand(string cLine, struct command_t *cmd) {
-/* Determine command name and construct the parameter list 
-
-    int argc;
-    char **clPtr;
-
-/* Initialization 
-    clPtr = &cLine;
-    argc = 0;
-    cmd->argv[argc] = (char *) malloc(MAX_ARG_LEN);
-/* Fill argv[] 
-    while((cmd->argv[argc] = strsep(clPtr, WHITESPACE)) != NULL) {
-        cmd->argv[++argc] = (char *) malloc(MAX_ARG_LEN);
     }
-
-/* Set the command name and argc 
-    cmd->argc = argc-1;
-    cmd->name = (char *) malloc(sizeof(cmd->argv[0]));
-    strcpy(cmd->name, cmd->argv[0]);
-//    printf("HHH: %s\n", cmd->name);
-    return  1;	
-}*/
+    
+    return 0;
+}
