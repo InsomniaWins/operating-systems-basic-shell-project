@@ -16,7 +16,10 @@ struct commandType {
     string name;
     // vector of arguments as strings (i.e. ["c", "-o", "compiled program name"])
     vector<string> arguments;
-    char *argv[64];
-    //we are going to need this for the execution
-    //64 uis the original max arg length
+
+
+
+    //char *argv[64];    // I dont think we need this char*[] anymore - Andrew I
+            //we are going to need this for the execution
+            //64 uis the original max arg length
 };
