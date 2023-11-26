@@ -86,12 +86,10 @@ int main(){
 
 
         // if command is quit command (no need for new process/thread)
-        // TODO: make quit command NOT case sensitive
-        string hold = command.arguments[0];
-        
-        
-        if((hold == "quit") || (hold == "Quit") || (hold == "QUIT")) {
+        // TODO: quit command throws 'std::out_of_range' error
+        if((command.name == "quit") || (command.name == "Quit") || (command.name == "QUIT")) {
             // exit main loop and finish shell process
+            cout << "HOLD: " << command.name << '\n';
             break;
         }
 
