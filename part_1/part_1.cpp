@@ -8,7 +8,7 @@
 
 // [Andrew I] : (responding to above comment)
 // I think maybe your file structure is messed up? (maybe)
-// try deleting your local files and redownloading the source from github
+// try deleting your local files and redownloading the source from github to fixe file structure
 
 
 // run command:
@@ -25,14 +25,15 @@
 #include <string>
 #include <string.h>
 #include <vector>
+#include <pwd.h>
 
 
 // custom headers/includes
 #include "minishell.h"
 
-// namespace for ease of use of standard library
+// keep this! > allows using strings, vectors, etc. without typing 'std::'
+// also, please put "std::cout" and "std::cin" rather than just "cout" and "cin" to avoid ambiguity errors
 using namespace std;
-
 
 // parses the path variable for absolute directories of commands/programs
 vector<string> parsePath();
@@ -47,21 +48,17 @@ int parseCommand(string, struct commandType *);
 // print the input prompt
 void printPrompt();
 
-//this will be used to delete extra spaces
+// this will be used to delete extra spaces
 string eraseEndSpace(string);
+
+// exeutes the given commandType struct
+int executeCommand(struct commandType *);
+
+// gets working directory
+string getWorkingDirectory();
 
 
 int main(){
-
-    //Shell initialization
-    
-    // get vector of all path directories
-    vector<string> paths = parsePath();
-#ifdef DEBUGGING
-    for (int i = 0; i < paths.size(); i++) {
-        cout << "path dir [" << i << "] \"" << paths[i] << '"' << '\n';
-    }
-#endif
 
     // start shell main loop
     while (true) {
@@ -69,68 +66,99 @@ int main(){
         // print user input prompt
         printPrompt();
 
+
+
         // get user input string
         string inputCommand;
         getline(cin, inputCommand);
-        
+
+
+
         // parse input into command struct
         commandType command;
         parseCommand(inputCommand, &command);
 
-// TODO: appears that last argument gets cut off (maybe something to do with the parseCommand function)
-#ifdef DEBUGGING
-        for (int i = 0; i < command.arguments.size(); i++) {
-            cout << "command argument [" << i << "] \"" << command.arguments[i] << '"' << '\n';
+
+        #ifdef DEBUGGING
+            for (int i = 0; i < command.arguments.size(); i++) {
+                std::cout << "command argument [" << i << "] \"" << command.arguments[i] << '"' << '\n';
+            }
+        #endif
+
+
+        
+        // create new string to hold the command name in lower-case
+        string commandNameLowerCase(command.arguments[0]);
+
+        // convert the string to lower-case
+        for (int i = 0; i < commandNameLowerCase.length(); i++) {
+            if (isalpha(commandNameLowerCase[i])) {
+                commandNameLowerCase[i] = tolower(commandNameLowerCase[i]);
+            }
         }
-#endif
 
-
-        // if command is quit command (no need for new process/thread)
-        // TODO: quit command throws 'std::out_of_range' error
-        if((command.name == "quit") || (command.name == "Quit") || (command.name == "QUIT")) {
+        // if user types any case version of quit, then close shell program
+        if(commandNameLowerCase == "quit") {
             // exit main loop and finish shell process
-            cout << "HOLD: " << command.name << '\n';
             break;
         }
 
 
-        // get path of command
-        string commandPath = lookupPath(command.arguments[0], paths);
+        // if user wants to change working directory
+        if (commandNameLowerCase == "cd") {
+            string newDirectory = command.arguments[1];
+            string workingDirectory = getWorkingDirectory();
 
-        // ask user for input again if path of command could not be found
-        if (commandPath.empty()) {
-            cout << "command: " << command.arguments[0] << " is not a recognized command!\n";
-            continue; // changed from 'break' to 'continue' (break would end program, not ask for input again)
+            #ifdef DEBUGGING
+                std::cout << "working directory: " << workingDirectory << '\n';
+            #endif
+
+            chdir((string(workingDirectory) + '/' + newDirectory).c_str());
+
+            #ifdef DEBUGGING
+                workingDirectory = getWorkingDirectory();
+                std::cout << "new working directory: " << workingDirectory << '\n';
+            #endif
+
+            continue;
         }
-        
-        cout << "commandPath: " << commandPath << "\n";
 
-        int pid = fork();
+
+
+        // make child process to execute command
+        pid_t pid = fork();
         if (pid == 0) {
             
-            char const **arg_list = (char const **) malloc((command.arguments.size() + 1) * sizeof(char *));
-            if (arg_list == NULL) {
-                exit(EXIT_FAILURE);
-            }
-            arg_list[0] = command.name.c_str();
-            for (int i = 0; i < command.arguments.size(); i++) {
-                arg_list[(i + 1)] = command.arguments[i].c_str();
-            }
-            execv(commandPath.c_str(), (char * const *) arg_list);
-            free(arg_list); arg_list = NULL;
+            int returnStatus = executeCommand(&command);
+            exit(returnStatus);
 
-            cout << "done\n";
-
-            exit(EXIT_SUCCESS);
         } else {
             // wait for child to finish executing command
-            waitpid(pid, NULL, 0);
+            int returnStatus;
+            waitpid(pid, &returnStatus, 0);
+
+            if (returnStatus == EXIT_SUCCESS) {
+                
+                #ifdef DEBUGGING
+                    std::cout << "process finished executing successfully!";
+                #endif
+
+
+            } else {
+                if (returnStatus == EXIT_FAILURE) {
+
+                #ifdef DEBUGGING
+                    std::cout << "process exited with FAILURE code!";
+                #endif
+
+                }
+            }
         }
     }
 
     //Shell termination
 
-    cout << "finished shell program\n";
+    std::cout << "finished shell program\n";
 }
 
 
@@ -168,10 +196,10 @@ string lookupPath(string commandName, vector<string> paths){
 
         string currentAbsoluteDirectory = paths[i] + '/' + commandName;
 
-        // uncomment to check the directories that were checked
-#ifdef DEBUGGING
-        cout << "checking directory: \"" << currentAbsoluteDirectory << "\" for command/program \n";
-#endif
+        #ifdef DEBUGGING
+            std::cout << "checking directory: \"" << currentAbsoluteDirectory << "\" for command/program \n";
+        #endif
+
         if (access(currentAbsoluteDirectory.c_str(), R_OK) == 0) {
             // command exists in directory, return new string of current directory
             return string(paths[i]);
@@ -191,8 +219,14 @@ string lookupPath(string commandName, vector<string> paths){
 
 // prints a prompt for user to enter a command
 void printPrompt(){
-    cout << "\nEnter you command: \n";
+    passwd * user = getpwuid(getuid());
+    string username = user->pw_name;
+
+    string workingDirectory = getWorkingDirectory();
+    std::cout << '\n' << username << "~" << workingDirectory << "$ ";
 }
+
+
 
 // gets and parses the path string by using ':' as a delemiter/splitter
 // then returns a vector of all directories in path string
@@ -227,20 +261,18 @@ vector<string> parsePath() {
 
 
 // parses command input string into a commandType structure
-// TODO: last argument given appears to be cut off when put into struct
 int parseCommand(string commandString, struct commandType * commandStruct) {
 
     // param descriptions:
     //   commandString - the whole line of text inputted to the terminal
     //   commandStruct - pointer to struct that will be filled with command info
 
-    // we could use below, but it would require using the algorithm header which causes ambiguity of all cin and cout calls
-        // Solution: can do this (below) or can just make an understandable method
+    // Solution: can do this (below) or can just make an understandable method
         // commandString.erase(std::find_if(commandString.rbegin(), commandString.rend(), std::bind1st(std::not_equal_to<char>(), ' ')).base(), commandString.end());
-    // TODO: the eraseEndSpace function doesnt work when a command is given with no arguments
+    // TODO: the eraseEndSpace function crashes when a command is given with no arguments
     //       we might also want it to clip all types of whitespace rather than just ' ' char
-    // it crashes
-    commandString = eraseEndSpace(commandString);
+    //       TODO: the function also cuts off the last command argument for somereason
+    //commandString = eraseEndSpace(commandString); // commented out until fixed
 
     // parse
     int copyPosition = 0; // index of character to start substr method
@@ -278,9 +310,10 @@ int parseCommand(string commandString, struct commandType * commandStruct) {
             // dont need to update copyPosition, because end of string occured
         }
     }
-    
+
     return 0;
 }
+
 
 
 string eraseEndSpace(string inputString){
@@ -293,4 +326,80 @@ string eraseEndSpace(string inputString){
     }
     
     return shortString;
+}
+
+
+
+// executes command and prints output
+int executeCommand(struct commandType * command) {
+
+    // TODO: allow users to execute program with "./programname" (programname is replaced with the name of the program to execute)
+
+    // get vector of all path directories
+    vector<string> paths = parsePath();
+    #ifdef DEBUGGING
+        for (int i = 0; i < paths.size(); i++) {
+            std::cout << "path dir [" << i << "] \"" << paths[i] << '"' << '\n';
+        }
+    #endif
+
+
+
+    // get path of command
+    command->path = lookupPath(command->arguments[0], paths);
+
+    // ask user for input again if path of command could not be found
+    if (command->path.empty()) {
+        std::cout << "command: " << command->arguments[0] << " is not a recognized command!\n";
+        return EXIT_FAILURE; // changed from 'break' to 'continue' (break would end program, not ask for input again)
+    }
+
+    #ifdef DEBUGGING
+        std::cout << "path of requested program/command: \"" << command->path << "\"\n";
+    #endif
+
+
+
+    // get command as a full string
+    string fullCommandString = command->path + "/" + command->arguments[0];
+    for (int i = 0; i < command->arguments.size()-1; i++) {
+        fullCommandString = fullCommandString + ' ' + command->arguments[i+1];
+    }
+
+    #ifdef DEBUGGING
+        std::cout << "full command string: " << fullCommandString << "\n";
+    #endif
+
+    // create a pipe stream to get output of command
+    FILE * filePointer;
+    filePointer = popen(fullCommandString.c_str(), "r");
+
+    // if failed to create pipe, let user know return failure
+    if (filePointer == NULL) {
+        std::cout << "Unknown problem ocurred while executing that command!\n";
+        return EXIT_FAILURE;
+    }
+
+    // print command output
+    char outputText[2048];
+    while (fgets(outputText, sizeof(outputText), filePointer) != NULL) {
+        std::cout << outputText;
+    }
+
+    // close pipe
+    pclose(filePointer);
+
+    // return success
+    return EXIT_SUCCESS;
+}
+
+
+
+// gets the current working directory
+string getWorkingDirectory() {
+
+    char workingDirectory[2048];
+    getcwd(workingDirectory, 2048);
+    return string(workingDirectory);
+
 }

@@ -1,8 +1,8 @@
 #include <string>
 #include <vector>
 
-#define WHITESPACE      " .,\t\n"
-#define DEBUGGING       "commnet this out to disable debug messages"
+#define WHITESPACE      " ,\t\n" // I removed the '.' char from this list to allow changing directory to ".." (parent directory)
+//#define DEBUGGING       "comment this out to disable debug messages"
 
 #ifndef NULL
 #define NULL 
@@ -12,9 +12,10 @@ using namespace std;
 
 // structure that holds information of command inputted into shell
 struct commandType {
-    // name of the command (i.e. "gcc" or "g++" or "cd" or "ls" etc . . .)
-    string name;
-    // vector of arguments as strings (i.e. ["c", "-o", "compiled program name"])
+    
+    string path;
+
+    // vector of command name AND arguments as strings (i.e. ["gcc", "c", "-o", "compiled program name"])
     vector<string> arguments;
 
 
