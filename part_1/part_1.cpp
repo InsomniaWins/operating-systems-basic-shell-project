@@ -1,9 +1,9 @@
-// compile command:
-//    g++ "Project 2.0/pt1.cpp" -lpthread -o "part1"
+// compile command: (run from main project directory)
+//    g++ "part_1/part_1.cpp" -lpthread -o "part_1"
 //I did this actually:
 //      g++ pt1.cpp minishell.h -o part1
 // run command:
-//    ./"part1"
+//    ./"part_1"
 
 
 // external headers/includes
