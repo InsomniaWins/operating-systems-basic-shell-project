@@ -1,9 +1,18 @@
 // compile command: (run from main project directory)
-//    g++ "part_1/part_1.cpp" -lpthread -o "part_1"
-//I did this actually:
+//    g++ "part_1/part_1.cpp" -lpthread -o "out/part_1"
+
+
+// [Andrew K] : 
+// I did this actually:
 //      g++ pt1.cpp minishell.h -o part1
+
+// [Andrew I] : (responding to above comment)
+// I think maybe your file structure is messed up? (maybe)
+// try deleting your local files and redownloading the source from github
+
+
 // run command:
-//    ./"part_1"
+//    ./"out/part_1"
 
 
 // external headers/includes
@@ -16,8 +25,7 @@
 #include <string>
 #include <string.h>
 #include <vector>
-#include <functional>
-#include <algorithm>
+
 
 // custom headers/includes
 #include "minishell.h"
@@ -49,11 +57,11 @@ int main(){
     
     // get vector of all path directories
     vector<string> paths = parsePath();
-    /*    uncomment to print all dirs in PATH
-    for (int i = 0; i < parsedPaths.size(); i++) {
-        cout << '"' << parsedPaths[i] << '"' << '\n';
+#ifdef DEBUGGING
+    for (int i = 0; i < paths.size(); i++) {
+        cout << "path dir [" << i << "] \"" << paths[i] << '"' << '\n';
     }
-    */
+#endif
 
     // start shell main loop
     while (true) {
@@ -68,15 +76,21 @@ int main(){
         // parse input into command struct
         commandType command;
         parseCommand(inputCommand, &command);
-        /*    uncomment to print all command arguments
+
+// TODO: appears that last argument gets cut off (maybe something to do with the parseCommand function)
+#ifdef DEBUGGING
         for (int i = 0; i < command.arguments.size(); i++) {
-            cout << '"' << command.arguments[i] << '"' << '\n';
-        }*/
+            cout << "command argument [" << i << "] \"" << command.arguments[i] << '"' << '\n';
+        }
+#endif
+
 
         // if command is quit command (no need for new process/thread)
         // TODO: make quit command NOT case sensitive
         string hold = command.arguments[0];
-        if((hold == "quit")||(hold == "Quit")||(hold == "QUIT")) {
+        
+        
+        if((hold == "quit") || (hold == "Quit") || (hold == "QUIT")) {
             // exit main loop and finish shell process
             break;
         }
@@ -88,21 +102,27 @@ int main(){
         // ask user for input again if path of command could not be found
         if (commandPath.empty()) {
             cout << "command: " << command.arguments[0] << " is not a recognized command!\n";
-            break;
+            continue; // changed from 'break' to 'continue' (break would end program, not ask for input again)
         }
         
         cout << "commandPath: " << commandPath << "\n";
-        for(int i=0; i<command.arguments.size(); i++){
-            command.argv[i] = command.arguments.at(i).data();
-        }
-        char *commandPathChar = commandPath.data();
 
         int pid = fork();
         if (pid == 0) {
-            // run command in child
-            // TODO: execute command
-            cout << "Hello from pid: " << getpid() << "\n";
-            execv(commandPathChar, command.argv);
+            
+            char const **arg_list = (char const **) malloc((command.arguments.size() + 1) * sizeof(char *));
+            if (arg_list == NULL) {
+                exit(EXIT_FAILURE);
+            }
+            arg_list[0] = command.name.c_str();
+            for (int i = 0; i < command.arguments.size(); i++) {
+                arg_list[(i + 1)] = command.arguments[i].c_str();
+            }
+            execv(commandPath.c_str(), (char * const *) arg_list);
+            free(arg_list); arg_list = NULL;
+
+            cout << "done\n";
+
             exit(EXIT_SUCCESS);
         } else {
             // wait for child to finish executing command
@@ -151,8 +171,9 @@ string lookupPath(string commandName, vector<string> paths){
         string currentAbsoluteDirectory = paths[i] + '/' + commandName;
 
         // uncomment to check the directories that were checked
-        cout << "[lookupPath] checking directory:  " << currentAbsoluteDirectory << "\n";
-
+#ifdef DEBUGGING
+        cout << "checking directory: \"" << currentAbsoluteDirectory << "\" for command/program \n";
+#endif
         if (access(currentAbsoluteDirectory.c_str(), R_OK) == 0) {
             // command exists in directory, return new string of current directory
             return string(paths[i]);
@@ -208,16 +229,19 @@ vector<string> parsePath() {
 
 
 // parses command input string into a commandType structure
+// TODO: last argument given appears to be cut off when put into struct
 int parseCommand(string commandString, struct commandType * commandStruct) {
 
     // param descriptions:
     //   commandString - the whole line of text inputted to the terminal
     //   commandStruct - pointer to struct that will be filled with command info
 
-    // TODO: command probably needs to trim extra whitespaces from end of command
-    // to prevent additional args like ["arg1","arg2", ... ,"",""]
-    //Solution: can do this (below) or can just make an understandable method
-    //commandString.erase(std::find_if(commandString.rbegin(), commandString.rend(), std::bind1st(std::not_equal_to<char>(), ' ')).base(), commandString.end());
+    // we could use below, but it would require using the algorithm header which causes ambiguity of all cin and cout calls
+        // Solution: can do this (below) or can just make an understandable method
+        // commandString.erase(std::find_if(commandString.rbegin(), commandString.rend(), std::bind1st(std::not_equal_to<char>(), ' ')).base(), commandString.end());
+    // TODO: the eraseEndSpace function doesnt work when a command is given with no arguments
+    //       we might also want it to clip all types of whitespace rather than just ' ' char
+    // it crashes
     commandString = eraseEndSpace(commandString);
 
     // parse
@@ -259,13 +283,16 @@ int parseCommand(string commandString, struct commandType * commandStruct) {
     
     return 0;
 }
+
+
 string eraseEndSpace(string inputString){
     string shortString = inputString;
     int pos = shortString.length()-1;
+
     while(shortString[pos-1] != ' '){
         shortString.erase(pos);
         pos--;
     }
-    return shortString;
     
+    return shortString;
 }

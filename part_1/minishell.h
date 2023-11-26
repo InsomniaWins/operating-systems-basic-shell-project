@@ -2,6 +2,7 @@
 #include <vector>
 
 #define WHITESPACE      " .,\t\n"
+#define DEBUGGING       "commnet this out to disable debug messages"
 
 #ifndef NULL
 #define NULL 
